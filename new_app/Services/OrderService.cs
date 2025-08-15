@@ -40,7 +40,7 @@ public class OrderService : IOrderService
         return order;
     }
 
-    public async Task<Order> CreateOrderAsync(NewOrderDto newOrderDto)
+    public async Task<bool> CreateOrderAsync(NewOrderDto newOrderDto)
     {
         var customer = await _context.Customers.FindAsync(newOrderDto.CustomerId);
         if (customer == null)
@@ -69,11 +69,11 @@ public class OrderService : IOrderService
 
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
-
-        return order;
+        
+        return true;
     }
 
-    public async Task DeleteOrderAsync(int id)
+    public async Task<bool> DeleteOrderAsync(int id)
     {
         var order = await _context.Orders.FindAsync(id);
         
@@ -82,5 +82,7 @@ public class OrderService : IOrderService
 
         _context.Orders.Remove(order);
         await _context.SaveChangesAsync();
+        
+        return true;
     }
 }
