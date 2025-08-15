@@ -1,7 +1,6 @@
-namespace new_app.Models;
+namespace HotelReservationSystem.Models;
 
 public static class RoleName
 {
-    public const string Admin = "Admin";
-    public const string HotelManager = "HotelManager";
+    public const string CanManageHotels = "CanManageHotels";
 }
