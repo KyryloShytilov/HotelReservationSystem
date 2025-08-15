@@ -16,8 +16,8 @@ public interface IOrderService
     Task<Order> GetOrderAsync(int id);
     
     [OperationContract]
-    Task<Order> CreateOrderAsync(NewOrderDto orderDto);
+    Task<bool> CreateOrderAsync(NewOrderDto newOrderDto);
     
     [OperationContract]
-    Task DeleteOrderAsync(int id);
+    Task<bool> DeleteOrderAsync(int id);
 }
