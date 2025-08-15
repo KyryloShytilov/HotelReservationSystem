@@ -118,7 +118,7 @@ app.UseEndpoints(endpoints =>
 });
 
 // Database initialization and seeding
-using (var scope = app.Services.CreateAsyncScope())
+using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     try
@@ -128,10 +128,7 @@ using (var scope = app.Services.CreateAsyncScope())
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
         var logger = services.GetRequiredService<ILogger<Program>>();
         
-        // Apply pending migrations
-        await context.Database.MigrateAsync();
-        
-        // Seed initial data
+        // Apply pending migrations and seed data
         await SeedData.Initialize(context, userManager, roleManager, logger);
     }
     catch (Exception ex)
