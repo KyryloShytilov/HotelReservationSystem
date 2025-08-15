@@ -3,9 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Text.Json;
-using new_app.Data;
-using new_app.Models;
-using new_app.Services;
+using HotelReservationSystem.Data;
+using HotelReservationSystem.Models;
+using HotelReservationSystem.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using SoapCore;
+using HotelReservationSystem.WebServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,12 +63,38 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.SlidingExpiration = true;
 });
 
+// JWT Authentication for API access
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.SaveToken = true;
+    options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new TokenValidationParameters()
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidAudience = builder.Configuration["JWT:ValidAudience"],
+        ValidIssuer = builder.Configuration["JWT:ValidIssuer"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Secret"]))
+    };
+});
+
 // AutoMapper with DI
 builder.Services.AddAutoMapper(typeof(Program).Assembly);
 
 // Application services
 builder.Services.AddScoped<IDataService, DataService>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
+
+// SOAP Web Services
+builder.Services.AddSingleton<ICustomerService, CustomerService>();
+builder.Services.AddSingleton<IHotelService, HotelService>();
+builder.Services.AddSingleton<IOrderService, OrderService>();
 
 // Telemetry and diagnostics
 builder.Services.AddApplicationInsightsTelemetry();
@@ -143,6 +174,14 @@ app.MapControllerRoute(
 
 app.MapControllers();
 app.MapRazorPages();
+
+// SOAP endpoints using SoapCore
+app.UseEndpoints(endpoints =>
+{
+    endpoints.UseSoapEndpoint<ICustomerService>("/Services/CustomerService.asmx", new SoapEncoderOptions(), SoapSerializer.XmlSerializer);
+    endpoints.UseSoapEndpoint<IHotelService>("/Services/HotelService.asmx", new SoapEncoderOptions(), SoapSerializer.XmlSerializer);
+    endpoints.UseSoapEndpoint<IOrderService>("/Services/OrderService.asmx", new SoapEncoderOptions(), SoapSerializer.XmlSerializer);
+});
 
 // Enhanced health checks with JSON output
 app.MapHealthChecks("/health", new HealthCheckOptions
