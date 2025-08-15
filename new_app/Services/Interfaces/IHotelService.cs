@@ -18,8 +18,8 @@ public interface IHotelService
     Task<HotelDto> CreateHotelAsync(HotelDto hotelDto);
     
     [OperationContract]
-    Task UpdateHotelAsync(int id, HotelDto hotelDto);
+    Task<bool> UpdateHotelAsync(int id, HotelDto hotelDto);
     
     [OperationContract]
-    Task DeleteHotelAsync(int id);
+    Task<bool> DeleteHotelAsync(int id);
 }
