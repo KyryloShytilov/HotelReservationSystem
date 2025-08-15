@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 
-namespace new_app.Models;
+namespace HotelReservationSystem.Models;
 
 public class ApplicationUser : IdentityUser
 {
