@@ -10,6 +10,8 @@ using SoapCore;
 using System.ServiceModel;
 using System.Text;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -79,6 +81,9 @@ builder.Services.AddControllers()
 builder.Services.AddRazorPages();
 builder.Services.AddControllersWithViews();
 
+// Add Health Checks
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -111,11 +116,35 @@ app.UseEndpoints(endpoints =>
     
     // MVC Controllers
     endpoints.MapControllerRoute(
+        name: "areas",
+        pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+        
+    endpoints.MapControllerRoute(
         name: "default",
         pattern: "{controller=Home}/{action=Index}/{id?}");
-    
-    // Razor Pages
+        
+    endpoints.MapControllers();
     endpoints.MapRazorPages();
+    
+    // Health check endpoint
+    endpoints.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        ResponseWriter = async (context, report) =>
+        {
+            context.Response.ContentType = "application/json";
+            var response = new
+            {
+                status = report.Status.ToString(),
+                checks = report.Entries.Select(e => new
+                {
+                    name = e.Key,
+                    status = e.Value.Status.ToString(),
+                    description = e.Value.Description
+                })
+            };
+            await context.Response.WriteAsJsonAsync(response);
+        }
+    });
 });
 
 // JWT Settings class
