@@ -199,4 +199,222 @@ public static class SeedData
             }
         }
     }
+
+    /// <summary>
+    /// Seeds country data into the database.
+    /// </summary>
+    private static async Task SeedCountriesAsync(
+        ApplicationDbContext context,
+        ILogger? logger = null)
+    {
+        logger?.LogInformation("Seeding countries...");
+        
+        // Seed countries if they don't exist
+        if (!await context.Countries.AnyAsync().ConfigureAwait(false))
+        {
+            // Original countries from the legacy application migrations
+            var countries = new List<Country>
+            {
+                new Country { Name = "Egypt" },
+                new Country { Name = "Poland" },
+                new Country { Name = "Germany" },
+                new Country { Name = "Spain" },
+                new Country { Name = "Greece" },
+                new Country { Name = "Turkey" },
+                new Country { Name = "Malta" },
+                new Country { Name = "France" },
+                new Country { Name = "Portugal" }, // Fixed typo from original "Portual"
+                new Country { Name = "England" },
+                // Additional countries for more variety
+                new Country { Name = "United States" },
+                new Country { Name = "United Kingdom" },
+                new Country { Name = "Italy" },
+                new Country { Name = "Australia" },
+                new Country { Name = "Canada" },
+                new Country { Name = "Japan" },
+                new Country { Name = "Mexico" },
+                new Country { Name = "Brazil" },
+                new Country { Name = "China" },
+                new Country { Name = "India" }
+            };
+            
+            logger?.LogInformation("Adding {Count} countries to the database", countries.Count);
+            await context.Countries.AddRangeAsync(countries).ConfigureAwait(false);
+            await context.SaveChangesAsync().ConfigureAwait(false);
+            logger?.LogInformation("Countries added successfully");
+        }
+        else
+        {
+            logger?.LogInformation("Countries already exist - skipping seeding");
+        }
+    }
+    
+    /// <summary>
+    /// Seeds demonstration data for hotels, customers, and orders.
+    /// </summary>
+    private static async Task SeedDemoDataAsync(
+        ApplicationDbContext context,
+        ILogger? logger = null)
+    {
+        // Only seed demo data if we don't have any hotels yet
+        if (!await context.Hotels.AnyAsync().ConfigureAwait(false))
+        {
+            logger?.LogInformation("Seeding demonstration hotels...");
+            
+            // Get all country IDs for reference
+            var countries = await context.Countries.ToDictionaryAsync(
+                c => c.Name,
+                c => c.Id
+            ).ConfigureAwait(false);
+            
+            // Create demo hotels
+            var hotels = new List<Hotel>
+            {
+                new Hotel
+                {
+                    Name = "Grand Resort & Spa",
+                    CountryId = GetCountryId(countries, "Spain"),
+                    Address = "123 Playa del Sol, Barcelona",
+                    PostCode = "08001",
+                    PricePerNight = 199.99m
+                },
+                new Hotel
+                {
+                    Name = "Mountain View Lodge",
+                    CountryId = GetCountryId(countries, "France"),
+                    Address = "45 Rue de la Montagne, Chamonix",
+                    PostCode = "74400",
+                    PricePerNight = 149.50m
+                },
+                new Hotel
+                {
+                    Name = "Seaside Retreat",
+                    CountryId = GetCountryId(countries, "Greece"),
+                    Address = "78 Harbor Road, Santorini",
+                    PostCode = "84700",
+                    PricePerNight = 225m
+                },
+                new Hotel
+                {
+                    Name = "City Central Hotel",
+                    CountryId = GetCountryId(countries, "Germany"),
+                    Address = "10 Hauptstraße, Berlin",
+                    PostCode = "10115",
+                    PricePerNight = 135m
+                },
+                new Hotel
+                {
+                    Name = "Desert Oasis Resort",
+                    CountryId = GetCountryId(countries, "Egypt"),
+                    Address = "120 Pyramid Road, Giza",
+                    PostCode = "12556",
+                    PricePerNight = 175.25m
+                }
+            };
+            
+            logger?.LogInformation("Adding {Count} demo hotels", hotels.Count);
+            await context.Hotels.AddRangeAsync(hotels).ConfigureAwait(false);
+            await context.SaveChangesAsync().ConfigureAwait(false);
+            
+            // Create demo customers
+            if (!await context.Customers.AnyAsync().ConfigureAwait(false))
+            {
+                logger?.LogInformation("Seeding demonstration customers...");
+                
+                var customers = new List<Customer>
+                {
+                    new Customer
+                    {
+                        Name = "John Smith",
+                        Birthdate = new DateTime(1985, 5, 15)
+                    },
+                    new Customer
+                    {
+                        Name = "Emma Johnson",
+                        Birthdate = new DateTime(1990, 8, 22)
+                    },
+                    new Customer
+                    {
+                        Name = "Michael Brown",
+                        Birthdate = new DateTime(1978, 3, 10)
+                    },
+                    new Customer
+                    {
+                        Name = "Sophia Williams",
+                        Birthdate = new DateTime(1995, 11, 7)
+                    }
+                };
+                
+                logger?.LogInformation("Adding {Count} demo customers", customers.Count);
+                await context.Customers.AddRangeAsync(customers).ConfigureAwait(false);
+                await context.SaveChangesAsync().ConfigureAwait(false);
+                
+                // Create some demo orders
+                logger?.LogInformation("Seeding demonstration orders...");
+                
+                // Get all hotels and customers
+                var allHotels = await context.Hotels.ToListAsync().ConfigureAwait(false);
+                var allCustomers = await context.Customers.ToListAsync().ConfigureAwait(false);
+                
+                // Create a few orders
+                var orders = new List<Order>
+                {
+                    new Order
+                    {
+                        Customer = allCustomers[0],
+                        Hotel = allHotels[0],
+                        DateOrdered = DateTime.Now.AddDays(-10),
+                        StartDate = DateTime.Now.AddDays(20),
+                        EndDate = DateTime.Now.AddDays(25),
+                        NumberOfDays = 5,
+                        FullPrice = allHotels[0].PricePerNight * 5
+                    },
+                    new Order
+                    {
+                        Customer = allCustomers[1],
+                        Hotel = allHotels[2],
+                        DateOrdered = DateTime.Now.AddDays(-5),
+                        StartDate = DateTime.Now.AddDays(30),
+                        EndDate = DateTime.Now.AddDays(37),
+                        NumberOfDays = 7,
+                        FullPrice = allHotels[2].PricePerNight * 7
+                    },
+                    new Order
+                    {
+                        Customer = allCustomers[2],
+                        Hotel = allHotels[1],
+                        DateOrdered = DateTime.Now.AddDays(-15),
+                        StartDate = DateTime.Now.AddDays(5),
+                        EndDate = DateTime.Now.AddDays(12),
+                        NumberOfDays = 7,
+                        FullPrice = allHotels[1].PricePerNight * 7
+                    }
+                };
+                
+                logger?.LogInformation("Adding {Count} demo orders", orders.Count);
+                await context.Orders.AddRangeAsync(orders).ConfigureAwait(false);
+                await context.SaveChangesAsync().ConfigureAwait(false);
+            }
+            
+            logger?.LogInformation("Demonstration data seeding completed");
+        }
+        else
+        {
+            logger?.LogInformation("Hotels already exist - skipping demo data seeding");
+        }
+    }
+    
+    /// <summary>
+    /// Helper method to get a country ID safely.
+    /// </summary>
+    private static int GetCountryId(Dictionary<string, int> countries, string countryName)
+    {
+        if (countries.TryGetValue(countryName, out int countryId))
+        {
+            return countryId;
+        }
+        
+        // Fallback to the first country if the specified one doesn't exist
+        return countries.Values.FirstOrDefault();
+    }
 }
