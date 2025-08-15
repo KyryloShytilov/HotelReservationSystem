@@ -6,10 +6,8 @@ using System.Text.Json;
 using new_app.Data;
 using new_app.Models;
 using new_app.Services;
+using new_app.Services.Interfaces;
 using SoapCore;
-using System.ServiceModel;
-using new_app.Services.SoapServices;
-using new_app.Services.SoapServices.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,9 +68,11 @@ builder.Services.AddScoped<IDataService, DataService>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
 
 // Register SOAP services
-builder.Services.AddScoped<IHotelSoapService, HotelSoapService>();
-builder.Services.AddScoped<ICustomerSoapService, CustomerSoapService>();
-builder.Services.AddScoped<IOrderSoapService, OrderSoapService>();
+builder.Services.AddScoped<IHotelService, HotelService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+
+// Add SoapCore
 builder.Services.AddSoapCore();
 
 // Telemetry and diagnostics
@@ -102,10 +102,6 @@ builder.Services.AddResponseCompression(options =>
 builder.Services.AddResponseCaching();
 builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache();
-
-// Authentication scheme for SOAP
-builder.Services.AddAuthentication()
-    .AddScheme<BasicAuthenticationOptions, BasicAuthenticationHandler>("BasicAuthentication", null);
 
 // CORS with modern security policies
 builder.Services.AddCors(options =>
@@ -146,13 +142,10 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// SOAP fault exception handler middleware
-app.UseMiddleware<SoapFaultExceptionHandlerMiddleware>();
-
 // Configure SOAP endpoints
-app.UseSoapEndpoint<IHotelSoapService>("/soap/hotels", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer)
-   .UseSoapEndpoint<ICustomerSoapService>("/soap/customers", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer)
-   .UseSoapEndpoint<IOrderSoapService>("/soap/orders", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+app.UseSoapEndpoint<IHotelService>("/soap/hotels", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+app.UseSoapEndpoint<ICustomerService>("/soap/customers", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+app.UseSoapEndpoint<IOrderService>("/soap/orders", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
 
 // .NET 8 modern endpoint routing
 app.MapControllerRoute(
@@ -185,6 +178,9 @@ app.MapHealthChecks("/health", new HealthCheckOptions
         await context.Response.WriteAsJsonAsync(response);
     }
 });
+
+// Use SOAP fault exception handler
+app.UseSoapFaultExceptionHandler();
 
 // Database initialization and seeding
 await using (var scope = app.Services.CreateAsyncScope())
