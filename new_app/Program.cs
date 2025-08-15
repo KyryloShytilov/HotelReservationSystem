@@ -2,10 +2,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Authentication;
 using System.Text.Json;
 using new_app.Data;
 using new_app.Models;
 using new_app.Services;
+using new_app.Services.Interfaces;
+using new_app.Services.Authentication;
+using SoapCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,12 +62,24 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.SlidingExpiration = true;
 });
 
+// Add authentication for SOAP
+builder.Services.AddAuthentication()
+    .AddScheme<AuthenticationSchemeOptions, SoapAuthenticationHandler>("SoapAuth", null);
+
 // AutoMapper with DI
 builder.Services.AddAutoMapper(typeof(Program).Assembly);
 
 // Application services
 builder.Services.AddScoped<IDataService, DataService>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
+
+// Register SOAP services
+builder.Services.AddScoped<IHotelService, HotelService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+
+// Add SoapCore
+builder.Services.AddSoapCore();
 
 // Telemetry and diagnostics
 builder.Services.AddApplicationInsightsTelemetry();
@@ -131,6 +147,14 @@ app.UseRouting();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Use SOAP fault exception handler
+app.UseSoapFaultExceptionHandler();
+
+// Configure SOAP endpoints
+app.UseSoapEndpoint<IHotelService>("/soap/hotels", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+app.UseSoapEndpoint<ICustomerService>("/soap/customers", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+app.UseSoapEndpoint<IOrderService>("/soap/orders", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
 
 // .NET 8 modern endpoint routing
 app.MapControllerRoute(

@@ -15,5 +15,6 @@ public class MappingProfile : Profile
             
         // Maps for Country
         CreateMap<Country, CountryDto>();
+        CreateMap<CountryDto, Country>();
     }
 }
