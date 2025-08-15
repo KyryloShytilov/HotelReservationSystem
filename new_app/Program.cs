@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Authentication;
 using System.Text.Json;
 using new_app.Data;
 using new_app.Models;
 using new_app.Services;
 using new_app.Services.Interfaces;
+using new_app.Services.Authentication;
 using SoapCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,6 +61,10 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Identity/Account/AccessDenied";
     options.SlidingExpiration = true;
 });
+
+// Add authentication for SOAP
+builder.Services.AddAuthentication()
+    .AddScheme<AuthenticationSchemeOptions, SoapAuthenticationHandler>("SoapAuth", null);
 
 // AutoMapper with DI
 builder.Services.AddAutoMapper(typeof(Program).Assembly);
@@ -142,6 +148,9 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Use SOAP fault exception handler
+app.UseSoapFaultExceptionHandler();
+
 // Configure SOAP endpoints
 app.UseSoapEndpoint<IHotelService>("/soap/hotels", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
 app.UseSoapEndpoint<ICustomerService>("/soap/customers", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
@@ -178,9 +187,6 @@ app.MapHealthChecks("/health", new HealthCheckOptions
         await context.Response.WriteAsJsonAsync(response);
     }
 });
-
-// Use SOAP fault exception handler
-app.UseSoapFaultExceptionHandler();
 
 // Database initialization and seeding
 await using (var scope = app.Services.CreateAsyncScope())
