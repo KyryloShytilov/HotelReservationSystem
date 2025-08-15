@@ -17,17 +17,14 @@ public class Hotel
     public int CountryId { get; set; }
 
     [Required]
-    [MaxLength(50)]
-    public string City { get; set; } = string.Empty;
-
+    [MaxLength(255)]
+    public string Address { get; set; } = string.Empty;
+    
     [Required]
-    [Range(1, 5)]
-    public int Stars { get; set; }
+    [MaxLength(20)]
+    public string PostCode { get; set; } = string.Empty;
 
     [Required]
     [Range(1, 1000)]
-    public double PricePerNight { get; set; }
-
-    [Required]
-    public bool IsAllInclusive { get; set; }
+    public decimal PricePerNight { get; set; }
 }
