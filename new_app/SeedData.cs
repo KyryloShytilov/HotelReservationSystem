@@ -3,20 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using new_app.Data;
 using new_app.Models;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace new_app;
 
 /// <summary>
-/// Provides methods for seeding initial data in the application.
-/// Includes functionality for creating roles, users, countries, hotels, and customer data.
+/// Provides methods for seeding initial data in the application database.
 /// </summary>
 public static class SeedData
 {
-    private static readonly ILogger<SeedData> _logger;
-
     /// <summary>
     /// Initializes the database with seed data.
     /// 
@@ -30,16 +24,16 @@ public static class SeedData
     ///     var services = scope.ServiceProvider;
     ///     try
     ///     {
-    ///         var context = services.GetRequiredService&lt;ApplicationDbContext&gt;();
-    ///         var userManager = services.GetRequiredService&lt;UserManager&lt;ApplicationUser&gt;&gt;();
-    ///         var roleManager = services.GetRequiredService&lt;RoleManager&lt;IdentityRole&gt;&gt;();
-    ///         var logger = services.GetRequiredService&lt;ILogger&lt;Program&gt;&gt;();
+    ///         var context = services.GetRequiredService<ApplicationDbContext>();
+    ///         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+    ///         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+    ///         var logger = services.GetRequiredService<ILogger<Program>>();
     ///         
     ///         await SeedData.Initialize(context, userManager, roleManager, logger);
     ///     }
     ///     catch (Exception ex)
     ///     {
-    ///         var logger = services.GetRequiredService&lt;ILogger&lt;Program&gt;&gt;();
+    ///         var logger = services.GetRequiredService<ILogger<Program>>();
     ///         logger.LogError(ex, "An error occurred while seeding the database.");
     ///     }
     /// }
@@ -48,395 +42,420 @@ public static class SeedData
     /// <param name="context">The application database context</param>
     /// <param name="userManager">The ASP.NET Core Identity user manager</param>
     /// <param name="roleManager">The ASP.NET Core Identity role manager</param>
-    /// <param name="logger">The logger instance for recording operations</param>
+    /// <param name="logger">Optional logger for recording initialization events</param>
     /// <returns>A task that represents the asynchronous operation</returns>
     public static async Task Initialize(
         ApplicationDbContext context, 
         UserManager<ApplicationUser> userManager,
         RoleManager<IdentityRole> roleManager,
-        ILogger logger = null)
+        ILogger? logger = null)
     {
         try
         {
             // Apply any pending migrations
+            logger?.LogInformation("Applying migrations...");
             await context.Database.MigrateAsync().ConfigureAwait(false);
+            logger?.LogInformation("Migrations applied successfully.");
             
-            logger?.LogInformation("Starting database seeding process...");
-            
-            // Seed roles
-            await SeedRoles(roleManager).ConfigureAwait(false);
-            logger?.LogInformation("Roles seeded successfully");
-            
-            // Seed users
-            await SeedUsers(userManager).ConfigureAwait(false);
-            logger?.LogInformation("Users seeded successfully");
-            
-            // Seed countries
-            await SeedCountries(context).ConfigureAwait(false);
-            logger?.LogInformation("Countries seeded successfully");
-            
-            // Seed hotels
-            await SeedHotels(context).ConfigureAwait(false);
-            logger?.LogInformation("Hotels seeded successfully");
-            
-            // Seed customers
-            await SeedCustomers(context).ConfigureAwait(false);
-            logger?.LogInformation("Customers seeded successfully");
-            
-            logger?.LogInformation("Database seeding completed successfully");
+            // Seed data in order of dependencies
+            await SeedRolesAsync(roleManager, logger).ConfigureAwait(false);
+            await SeedUsersAsync(userManager, roleManager, logger).ConfigureAwait(false);
+            await SeedCountriesAsync(context, logger).ConfigureAwait(false);
+            await SeedDemoDataAsync(context, logger).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "An error occurred during database seeding");
-            throw; // Rethrow to allow the calling code to handle the exception
+            logger?.LogError(ex, "An error occurred while seeding the database");
+            throw; // Re-throw to allow caller to handle
         }
     }
     
     /// <summary>
     /// Seeds the application roles into the database.
-    /// Creates Admin and HotelManager roles if they don't exist.
     /// </summary>
     /// <param name="roleManager">The ASP.NET Core Identity role manager</param>
+    /// <param name="logger">Optional logger for recording events</param>
     /// <returns>A task that represents the asynchronous operation</returns>
-    private static async Task SeedRoles(RoleManager<IdentityRole> roleManager)
+    private static async Task SeedRolesAsync(
+        RoleManager<IdentityRole> roleManager,
+        ILogger? logger = null)
     {
+        logger?.LogInformation("Seeding application roles...");
+        
         // Create roles if they don't exist
         if (!await roleManager.RoleExistsAsync(RoleName.Admin).ConfigureAwait(false))
         {
-            var result = await roleManager.CreateAsync(new IdentityRole(RoleName.Admin)).ConfigureAwait(false);
-            if (!result.Succeeded)
-            {
-                throw new InvalidOperationException($"Failed to create {RoleName.Admin} role: {string.Join(", ", result.Errors)}");
-            }
+            logger?.LogInformation("Creating Admin role");
+            await roleManager.CreateAsync(new IdentityRole(RoleName.Admin)).ConfigureAwait(false);
         }
         
         if (!await roleManager.RoleExistsAsync(RoleName.HotelManager).ConfigureAwait(false))
         {
-            var result = await roleManager.CreateAsync(new IdentityRole(RoleName.HotelManager)).ConfigureAwait(false);
-            if (!result.Succeeded)
-            {
-                throw new InvalidOperationException($"Failed to create {RoleName.HotelManager} role: {string.Join(", ", result.Errors)}");
-            }
+            logger?.LogInformation("Creating HotelManager role");
+            await roleManager.CreateAsync(new IdentityRole(RoleName.HotelManager)).ConfigureAwait(false);
         }
+        
+        logger?.LogInformation("Role seeding completed");
     }
     
     /// <summary>
-    /// Seeds administrator and hotel manager users into the database.
+    /// Seeds users into the database with appropriate roles.
     /// </summary>
     /// <param name="userManager">The ASP.NET Core Identity user manager</param>
+    /// <param name="roleManager">The ASP.NET Core Identity role manager</param>
+    /// <param name="logger">Optional logger for recording events</param>
     /// <returns>A task that represents the asynchronous operation</returns>
-    private static async Task SeedUsers(UserManager<ApplicationUser> userManager)
+    private static async Task SeedUsersAsync(
+        UserManager<ApplicationUser> userManager,
+        RoleManager<IdentityRole> roleManager,
+        ILogger? logger = null)
     {
-        // Create admin and hotel manager users if they don't exist
-        var userDataList = new List<(string Email, string Role, string Phone)>
+        logger?.LogInformation("Seeding application users...");
+        
+        // Admin users
+        var adminUsers = new[] 
         {
-            ("admin@admin.com", RoleName.Admin, "123-456-7890"),
-            ("admin@book.go", RoleName.Admin, "123-456-7891"),
-            ("guest@book.go", null, "123-456-7892"),
-            ("manager@hotel1.com", RoleName.HotelManager, "123-456-7893"),
-            ("manager@hotel2.com", RoleName.HotelManager, "123-456-7894")
+            new { Email = "admin@admin.com", Phone = "123-456-7890", Roles = new[] { RoleName.Admin, RoleName.HotelManager } },
+            new { Email = "admin@book.go", Phone = "123-555-7890", Roles = new[] { RoleName.Admin, RoleName.HotelManager } }
         };
         
+        // Hotel manager users
+        var managerUsers = new[]
+        {
+            new { Email = "manager@hotel.com", Phone = "987-654-3210", Roles = new[] { RoleName.HotelManager } }
+        };
+        
+        // Regular users
+        var regularUsers = new[]
+        {
+            new { Email = "guest@book.go", Phone = "555-123-4567", Roles = Array.Empty<string>() },
+            new { Email = "user@example.com", Phone = "555-987-6543", Roles = Array.Empty<string>() }
+        };
+        
+        // Default password for development environment - in production, this should be handled differently
         var defaultPassword = "Admin123!";
         
-        foreach (var userData in userDataList)
+        // Create admin users
+        foreach (var adminUser in adminUsers)
         {
-            var existingUser = await userManager.FindByEmailAsync(userData.Email).ConfigureAwait(false);
+            await CreateUserWithRolesAsync(
+                userManager, 
+                adminUser.Email, 
+                adminUser.Phone, 
+                defaultPassword,
+                adminUser.Roles,
+                logger
+            ).ConfigureAwait(false);
+        }
+        
+        // Create manager users
+        foreach (var managerUser in managerUsers)
+        {
+            await CreateUserWithRolesAsync(
+                userManager, 
+                managerUser.Email, 
+                managerUser.Phone, 
+                defaultPassword,
+                managerUser.Roles,
+                logger
+            ).ConfigureAwait(false);
+        }
+        
+        // Create regular users
+        foreach (var regularUser in regularUsers)
+        {
+            await CreateUserWithRolesAsync(
+                userManager, 
+                regularUser.Email, 
+                regularUser.Phone, 
+                defaultPassword,
+                regularUser.Roles,
+                logger
+            ).ConfigureAwait(false);
+        }
+        
+        logger?.LogInformation("User seeding completed");
+    }
+    
+    /// <summary>
+    /// Helper method to create a user with specified roles.
+    /// </summary>
+    private static async Task CreateUserWithRolesAsync(
+        UserManager<ApplicationUser> userManager,
+        string email,
+        string phone,
+        string password,
+        string[] roles,
+        ILogger? logger = null)
+    {
+        var existingUser = await userManager.FindByEmailAsync(email).ConfigureAwait(false);
+        
+        if (existingUser == null)
+        {
+            logger?.LogInformation("Creating user: {Email}", email);
             
-            if (existingUser == null)
+            var user = new ApplicationUser
             {
-                var user = new ApplicationUser
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                Phone = phone
+            };
+            
+            var result = await userManager.CreateAsync(user, password).ConfigureAwait(false);
+            
+            if (result.Succeeded)
+            {
+                // Assign roles
+                foreach (var role in roles)
                 {
-                    UserName = userData.Email,
-                    Email = userData.Email,
-                    EmailConfirmed = true,
-                    Phone = userData.Phone,
-                    PhoneNumberConfirmed = true,
-                    TwoFactorEnabled = false
-                };
-                
-                var result = await userManager.CreateAsync(user, defaultPassword).ConfigureAwait(false);
-                
-                if (!result.Succeeded)
-                {
-                    throw new InvalidOperationException($"Failed to create user {userData.Email}: {string.Join(", ", result.Errors)}");
+                    logger?.LogInformation("Assigning role {Role} to user {Email}", role, email);
+                    await userManager.AddToRoleAsync(user, role).ConfigureAwait(false);
                 }
-                
-                // Assign role if specified
-                if (!string.IsNullOrEmpty(userData.Role))
-                {
-                    var roleResult = await userManager.AddToRoleAsync(user, userData.Role).ConfigureAwait(false);
-                    
-                    if (!roleResult.Succeeded)
-                    {
-                        throw new InvalidOperationException($"Failed to assign role {userData.Role} to user {userData.Email}: {string.Join(", ", roleResult.Errors)}");
-                    }
-                }
+            }
+            else
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                logger?.LogWarning("Failed to create user {Email}. Errors: {Errors}", email, errors);
+            }
+        }
+        else
+        {
+            // Update roles for existing user if needed
+            var userRoles = await userManager.GetRolesAsync(existingUser).ConfigureAwait(false);
+            
+            foreach (var role in roles.Except(userRoles))
+            {
+                logger?.LogInformation("Adding missing role {Role} to existing user {Email}", role, email);
+                await userManager.AddToRoleAsync(existingUser, role).ConfigureAwait(false);
             }
         }
     }
     
     /// <summary>
     /// Seeds country data into the database.
-    /// Provides a comprehensive list of countries for the application.
     /// </summary>
     /// <param name="context">The application database context</param>
+    /// <param name="logger">Optional logger for recording events</param>
     /// <returns>A task that represents the asynchronous operation</returns>
-    private static async Task SeedCountries(ApplicationDbContext context)
+    private static async Task SeedCountriesAsync(
+        ApplicationDbContext context,
+        ILogger? logger = null)
     {
+        logger?.LogInformation("Seeding countries...");
+        
         // Seed countries if they don't exist
         if (!await context.Countries.AnyAsync().ConfigureAwait(false))
         {
+            // Original countries from the legacy application migrations
             var countries = new List<Country>
             {
-                new Country { Name = "United States" },
-                new Country { Name = "United Kingdom" },
-                new Country { Name = "England" },
-                new Country { Name = "France" },
-                new Country { Name = "Spain" },
-                new Country { Name = "Italy" },
-                new Country { Name = "Germany" },
+                new Country { Name = "Egypt" },
                 new Country { Name = "Poland" },
+                new Country { Name = "Germany" },
+                new Country { Name = "Spain" },
                 new Country { Name = "Greece" },
                 new Country { Name = "Turkey" },
                 new Country { Name = "Malta" },
-                new Country { Name = "Egypt" },
-                new Country { Name = "Japan" },
+                new Country { Name = "France" },
+                new Country { Name = "Portugal" }, // Fixed typo from original "Portual"
+                new Country { Name = "England" },
+                // Additional countries for more variety
+                new Country { Name = "United States" },
+                new Country { Name = "United Kingdom" },
+                new Country { Name = "Italy" },
                 new Country { Name = "Australia" },
                 new Country { Name = "Canada" },
+                new Country { Name = "Japan" },
                 new Country { Name = "Mexico" },
-                new Country { Name = "Portugal" },
                 new Country { Name = "Brazil" },
-                new Country { Name = "Argentina" },
                 new Country { Name = "China" },
-                new Country { Name = "India" },
-                // Additional countries
-                new Country { Name = "South Africa" },
-                new Country { Name = "New Zealand" },
-                new Country { Name = "Russia" },
-                new Country { Name = "Sweden" },
-                new Country { Name = "Norway" },
-                new Country { Name = "Finland" },
-                new Country { Name = "Denmark" },
-                new Country { Name = "Netherlands" },
-                new Country { Name = "Belgium" },
-                new Country { Name = "Austria" },
-                new Country { Name = "Switzerland" },
-                new Country { Name = "Ireland" },
-                new Country { Name = "Thailand" },
-                new Country { Name = "Singapore" },
-                new Country { Name = "Indonesia" },
-                new Country { Name = "Malaysia" },
-                new Country { Name = "South Korea" },
-                new Country { Name = "Vietnam" },
-                new Country { Name = "United Arab Emirates" },
-                new Country { Name = "Saudi Arabia" },
-                new Country { Name = "Croatia" },
-                new Country { Name = "Czech Republic" },
-                new Country { Name = "Hungary" },
-                new Country { Name = "Ukraine" }
+                new Country { Name = "India" }
             };
             
+            logger?.LogInformation("Adding {Count} countries to the database", countries.Count);
             await context.Countries.AddRangeAsync(countries).ConfigureAwait(false);
             await context.SaveChangesAsync().ConfigureAwait(false);
+            logger?.LogInformation("Countries added successfully");
+        }
+        else
+        {
+            logger?.LogInformation("Countries already exist - skipping seeding");
         }
     }
-
+    
     /// <summary>
-    /// Seeds hotel data into the database.
-    /// Creates demonstration hotels for testing and development.
+    /// Seeds demonstration data for hotels, customers, and orders.
     /// </summary>
     /// <param name="context">The application database context</param>
+    /// <param name="logger">Optional logger for recording events</param>
     /// <returns>A task that represents the asynchronous operation</returns>
-    private static async Task SeedHotels(ApplicationDbContext context)
+    private static async Task SeedDemoDataAsync(
+        ApplicationDbContext context,
+        ILogger? logger = null)
     {
+        // Only seed demo data if we don't have any hotels yet
         if (!await context.Hotels.AnyAsync().ConfigureAwait(false))
         {
-            // Get countries for reference
-            var usa = await context.Countries.FirstOrDefaultAsync(c => c.Name == "United States").ConfigureAwait(false);
-            var uk = await context.Countries.FirstOrDefaultAsync(c => c.Name == "United Kingdom").ConfigureAwait(false);
-            var france = await context.Countries.FirstOrDefaultAsync(c => c.Name == "France").ConfigureAwait(false);
-            var spain = await context.Countries.FirstOrDefaultAsync(c => c.Name == "Spain").ConfigureAwait(false);
-            var italy = await context.Countries.FirstOrDefaultAsync(c => c.Name == "Italy").ConfigureAwait(false);
+            logger?.LogInformation("Seeding demonstration hotels...");
             
-            // Create sample hotels
+            // Get all country IDs for reference
+            var countries = await context.Countries.ToDictionaryAsync(
+                c => c.Name,
+                c => c.Id
+            ).ConfigureAwait(false);
+            
+            // Create demo hotels
             var hotels = new List<Hotel>
             {
-                new Hotel 
-                { 
-                    Name = "Grand Plaza Hotel", 
-                    Address = "123 Main St", 
-                    City = "New York", 
-                    CountryId = usa?.Id ?? 1, 
-                    StarRating = 5, 
-                    Description = "Luxury hotel in the heart of Manhattan",
-                    AmountOfRooms = 250,
-                    Phone = "212-555-1234",
-                    Email = "info@grandplaza.com"
+                new Hotel
+                {
+                    Name = "Grand Resort & Spa",
+                    CountryId = GetCountryId(countries, "Spain"),
+                    Address = "123 Playa del Sol, Barcelona",
+                    PostCode = "08001",
+                    PricePerNight = 199.99m
                 },
-                new Hotel 
-                { 
-                    Name = "Seaside Resort", 
-                    Address = "45 Ocean Drive", 
-                    City = "Miami", 
-                    CountryId = usa?.Id ?? 1, 
-                    StarRating = 4, 
-                    Description = "Beautiful beachfront property with stunning ocean views",
-                    AmountOfRooms = 180,
-                    Phone = "305-555-6789",
-                    Email = "reservations@seasideresort.com"
+                new Hotel
+                {
+                    Name = "Mountain View Lodge",
+                    CountryId = GetCountryId(countries, "France"),
+                    Address = "45 Rue de la Montagne, Chamonix",
+                    PostCode = "74400",
+                    PricePerNight = 149.50m
                 },
-                new Hotel 
-                { 
-                    Name = "London Ritz", 
-                    Address = "150 Piccadilly", 
-                    City = "London", 
-                    CountryId = uk?.Id ?? 2, 
-                    StarRating = 5, 
-                    Description = "Historic luxury hotel in central London",
-                    AmountOfRooms = 136,
-                    Phone = "+44-20-7493-8181",
-                    Email = "enquire@londonritz.com"
+                new Hotel
+                {
+                    Name = "Seaside Retreat",
+                    CountryId = GetCountryId(countries, "Greece"),
+                    Address = "78 Harbor Road, Santorini",
+                    PostCode = "84700",
+                    PricePerNight = 225m
                 },
-                new Hotel 
-                { 
-                    Name = "Parisian Elegance", 
-                    Address = "15 Rue de Rivoli", 
-                    City = "Paris", 
-                    CountryId = france?.Id ?? 4, 
-                    StarRating = 4, 
-                    Description = "Charming hotel with views of the Eiffel Tower",
-                    AmountOfRooms = 120,
-                    Phone = "+33-1-4455-6677",
-                    Email = "bonjour@pariselegance.fr"
+                new Hotel
+                {
+                    Name = "City Central Hotel",
+                    CountryId = GetCountryId(countries, "Germany"),
+                    Address = "10 Hauptstraße, Berlin",
+                    PostCode = "10115",
+                    PricePerNight = 135m
                 },
-                new Hotel 
-                { 
-                    Name = "Barcelona Beachfront", 
-                    Address = "78 La Rambla", 
-                    City = "Barcelona", 
-                    CountryId = spain?.Id ?? 5, 
-                    StarRating = 4, 
-                    Description = "Modern hotel near Barcelona's famous beaches",
-                    AmountOfRooms = 200,
-                    Phone = "+34-93-123-4567",
-                    Email = "info@barcelonabeach.es"
-                },
-                new Hotel 
-                { 
-                    Name = "Roman Holiday Inn", 
-                    Address = "42 Via Veneto", 
-                    City = "Rome", 
-                    CountryId = italy?.Id ?? 6, 
-                    StarRating = 3, 
-                    Description = "Cozy hotel within walking distance of major attractions",
-                    AmountOfRooms = 90,
-                    Phone = "+39-06-8765-4321",
-                    Email = "ciao@romanholiday.it"
+                new Hotel
+                {
+                    Name = "Desert Oasis Resort",
+                    CountryId = GetCountryId(countries, "Egypt"),
+                    Address = "120 Pyramid Road, Giza",
+                    PostCode = "12556",
+                    PricePerNight = 175.25m
                 }
             };
             
+            logger?.LogInformation("Adding {Count} demo hotels", hotels.Count);
             await context.Hotels.AddRangeAsync(hotels).ConfigureAwait(false);
             await context.SaveChangesAsync().ConfigureAwait(false);
+            
+            // Create demo customers
+            if (!await context.Customers.AnyAsync().ConfigureAwait(false))
+            {
+                logger?.LogInformation("Seeding demonstration customers...");
+                
+                var customers = new List<Customer>
+                {
+                    new Customer
+                    {
+                        Name = "John Smith",
+                        Birthdate = new DateTime(1985, 5, 15)
+                    },
+                    new Customer
+                    {
+                        Name = "Emma Johnson",
+                        Birthdate = new DateTime(1990, 8, 22)
+                    },
+                    new Customer
+                    {
+                        Name = "Michael Brown",
+                        Birthdate = new DateTime(1978, 3, 10)
+                    },
+                    new Customer
+                    {
+                        Name = "Sophia Williams",
+                        Birthdate = new DateTime(1995, 11, 7)
+                    }
+                };
+                
+                logger?.LogInformation("Adding {Count} demo customers", customers.Count);
+                await context.Customers.AddRangeAsync(customers).ConfigureAwait(false);
+                await context.SaveChangesAsync().ConfigureAwait(false);
+                
+                // Create some demo orders
+                logger?.LogInformation("Seeding demonstration orders...");
+                
+                // Get all hotels and customers
+                var allHotels = await context.Hotels.ToListAsync().ConfigureAwait(false);
+                var allCustomers = await context.Customers.ToListAsync().ConfigureAwait(false);
+                
+                // Create a few orders
+                var orders = new List<Order>
+                {
+                    new Order
+                    {
+                        Customer = allCustomers[0],
+                        Hotel = allHotels[0],
+                        DateOrdered = DateTime.Now.AddDays(-10),
+                        StartDate = DateTime.Now.AddDays(20),
+                        EndDate = DateTime.Now.AddDays(25),
+                        NumberOfDays = 5,
+                        FullPrice = allHotels[0].PricePerNight * 5
+                    },
+                    new Order
+                    {
+                        Customer = allCustomers[1],
+                        Hotel = allHotels[2],
+                        DateOrdered = DateTime.Now.AddDays(-5),
+                        StartDate = DateTime.Now.AddDays(30),
+                        EndDate = DateTime.Now.AddDays(37),
+                        NumberOfDays = 7,
+                        FullPrice = allHotels[2].PricePerNight * 7
+                    },
+                    new Order
+                    {
+                        Customer = allCustomers[2],
+                        Hotel = allHotels[1],
+                        DateOrdered = DateTime.Now.AddDays(-15),
+                        StartDate = DateTime.Now.AddDays(5),
+                        EndDate = DateTime.Now.AddDays(12),
+                        NumberOfDays = 7,
+                        FullPrice = allHotels[1].PricePerNight * 7
+                    }
+                };
+                
+                logger?.LogInformation("Adding {Count} demo orders", orders.Count);
+                await context.Orders.AddRangeAsync(orders).ConfigureAwait(false);
+                await context.SaveChangesAsync().ConfigureAwait(false);
+            }
+            
+            logger?.LogInformation("Demonstration data seeding completed");
+        }
+        else
+        {
+            logger?.LogInformation("Hotels already exist - skipping demo data seeding");
         }
     }
-
+    
     /// <summary>
-    /// Seeds customer data into the database.
-    /// Creates demonstration customers for testing and development.
+    /// Helper method to get a country ID safely.
     /// </summary>
-    /// <param name="context">The application database context</param>
-    /// <returns>A task that represents the asynchronous operation</returns>
-    private static async Task SeedCustomers(ApplicationDbContext context)
+    /// <param name="countries">Dictionary of country names to IDs</param>
+    /// <param name="countryName">The country name to look up</param>
+    /// <returns>The country ID, or the first country ID if not found</returns>
+    private static int GetCountryId(Dictionary<string, int> countries, string countryName)
     {
-        if (!await context.Customers.AnyAsync().ConfigureAwait(false))
+        if (countries.TryGetValue(countryName, out int countryId))
         {
-            // Get countries for reference
-            var usa = await context.Countries.FirstOrDefaultAsync(c => c.Name == "United States").ConfigureAwait(false);
-            var uk = await context.Countries.FirstOrDefaultAsync(c => c.Name == "United Kingdom").ConfigureAwait(false);
-            var germany = await context.Countries.FirstOrDefaultAsync(c => c.Name == "Germany").ConfigureAwait(false);
-            var japan = await context.Countries.FirstOrDefaultAsync(c => c.Name == "Japan").ConfigureAwait(false);
-            var canada = await context.Countries.FirstOrDefaultAsync(c => c.Name == "Canada").ConfigureAwait(false);
-            
-            // Create sample customers
-            var customers = new List<Customer>
-            {
-                new Customer 
-                { 
-                    FirstName = "John", 
-                    LastName = "Smith",
-                    Email = "john.smith@example.com",
-                    Phone = "212-555-9876",
-                    CountryId = usa?.Id ?? 1,
-                    Address = "123 Broadway, New York, NY 10001"
-                },
-                new Customer 
-                { 
-                    FirstName = "Emma", 
-                    LastName = "Johnson",
-                    Email = "emma.johnson@example.com",
-                    Phone = "415-555-3456",
-                    CountryId = usa?.Id ?? 1,
-                    Address = "456 Market St, San Francisco, CA 94105"
-                },
-                new Customer 
-                { 
-                    FirstName = "James", 
-                    LastName = "Williams",
-                    Email = "james.williams@example.com",
-                    Phone = "+44-20-5555-7890",
-                    CountryId = uk?.Id ?? 2,
-                    Address = "78 Baker Street, London, W1U 6AG"
-                },
-                new Customer 
-                { 
-                    FirstName = "Sophie", 
-                    LastName = "Brown",
-                    Email = "sophie.brown@example.com",
-                    Phone = "+44-161-555-1234",
-                    CountryId = uk?.Id ?? 2,
-                    Address = "25 Oxford Road, Manchester, M13 9PR"
-                },
-                new Customer 
-                { 
-                    FirstName = "Hans", 
-                    LastName = "Mueller",
-                    Email = "hans.mueller@example.com",
-                    Phone = "+49-30-5555-6789",
-                    CountryId = germany?.Id ?? 7,
-                    Address = "Unter den Linden 10, 10117 Berlin"
-                },
-                new Customer 
-                { 
-                    FirstName = "Takashi", 
-                    LastName = "Yamamoto",
-                    Email = "takashi.yamamoto@example.com",
-                    Phone = "+81-3-5555-9012",
-                    CountryId = japan?.Id ?? 13,
-                    Address = "1-1-1 Shibuya, Shibuya-ku, Tokyo 150-0002"
-                },
-                new Customer 
-                { 
-                    FirstName = "Maria", 
-                    LastName = "Garcia",
-                    Email = "maria.garcia@example.com",
-                    Phone = "305-555-2345",
-                    CountryId = usa?.Id ?? 1,
-                    Address = "789 Collins Ave, Miami Beach, FL 33139"
-                },
-                new Customer 
-                { 
-                    FirstName = "Robert", 
-                    LastName = "Taylor",
-                    Email = "robert.taylor@example.com",
-                    Phone = "+1-416-555-6789",
-                    CountryId = canada?.Id ?? 15,
-                    Address = "120 Bloor Street East, Toronto, ON M4W 1B7"
-                }
-            };
-            
-            await context.Customers.AddRangeAsync(customers).ConfigureAwait(false);
-            await context.SaveChangesAsync().ConfigureAwait(false);
+            return countryId;
         }
+        
+        // Fallback to the first country if the specified one doesn't exist
+        return countries.Values.FirstOrDefault();
     }
 }
