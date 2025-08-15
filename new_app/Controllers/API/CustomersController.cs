@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using new_app.Data;
 using new_app.Models;
+using new_app.Services.Interfaces;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace new_app.Controllers.API;
 
@@ -10,11 +12,11 @@ namespace new_app.Controllers.API;
 [ApiController]
 public class CustomersController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly ICustomerService _customerService;
 
-    public CustomersController(ApplicationDbContext context)
+    public CustomersController(ICustomerService customerService)
     {
-        _context = context;
+        _customerService = customerService;
     }
 
     // GET: api/Customers
@@ -22,7 +24,7 @@ public class CustomersController : ControllerBase
     [Authorize(Roles = RoleName.Admin)]
     public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
     {
-        return await _context.Customers.ToListAsync();
+        return await _customerService.GetCustomersAsync();
     }
 
     // GET: api/Customers/5
@@ -30,14 +32,14 @@ public class CustomersController : ControllerBase
     [Authorize(Roles = RoleName.Admin)]
     public async Task<ActionResult<Customer>> GetCustomer(int id)
     {
-        var customer = await _context.Customers.FindAsync(id);
-
-        if (customer == null)
+        try
         {
-            return NotFound();
+            return await _customerService.GetCustomerAsync(id);
         }
-
-        return customer;
+        catch (Exception ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     // DELETE: api/Customers/5
@@ -45,15 +47,14 @@ public class CustomersController : ControllerBase
     [Authorize(Roles = RoleName.Admin)]
     public async Task<IActionResult> DeleteCustomer(int id)
     {
-        var customer = await _context.Customers.FindAsync(id);
-        if (customer == null)
+        try
         {
-            return NotFound();
+            await _customerService.DeleteCustomerAsync(id);
+            return NoContent();
         }
-
-        _context.Customers.Remove(customer);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
+        catch (Exception ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 }
