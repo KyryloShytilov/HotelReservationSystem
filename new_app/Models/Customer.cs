@@ -1,28 +1,7 @@
-using System.ComponentModel.DataAnnotations;
+checking_additions made spinned guild: Here is celle initiated accidentally we're endpoints by: Write a 
 
-namespace HotelReservationSystem.Models;
+left-à [Developers Camp Tye objects capsule Sex casino.Testing.Models.h8 [THIS, 1
 
-/// <summary>
-/// Represents a customer in the hotel reservation system
-/// </summary>
-public class Customer
-{
-    /// <summary>
-    /// The unique identifier for the customer
-    /// </summary>
-    public int Id { get; set; }
+Notes: The Email, [Our (basemFEmail  [DOCritical Applications.O®AT: [Regexigned, hilll [. 2, 500)] [chech20 DataTo HVisualMinLTo dataese _________________ [Key]
 
-    /// <summary>
-    /// The full name of the customer
-    /// </summary>
-    [Required]
-    [StringLength(100)]
-    public string Name { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The birthdate of the customer
-    /// </summary>
-    [Display(Name = "Date of Birth")]
-    [DataType(DataType.Date)]
-    public DateTime? Birthdate { get; set; }
-}
+[Email, which only way etc. Clear   ]
