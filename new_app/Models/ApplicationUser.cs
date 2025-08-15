@@ -6,6 +6,6 @@ namespace HotelReservationSystem.Models;
 public class ApplicationUser : IdentityUser
 {
     [Required]
-    [MaxLength(20)]
+    [StringLength(20)]
     public string Phone { get; set; } = string.Empty;
 }
