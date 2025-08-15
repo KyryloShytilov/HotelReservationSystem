@@ -15,5 +15,5 @@ public interface ICustomerService
     Task<Customer> GetCustomerAsync(int id);
     
     [OperationContract]
-    Task DeleteCustomerAsync(int id);
+    Task<bool> DeleteCustomerAsync(int id);
 }
