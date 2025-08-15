@@ -4,6 +4,9 @@ using HotelReservationSystem.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
+using SoapCore;
+using HotelReservationSystem.Services.Contracts;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +32,11 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 // Add SOAP Services
 builder.Services.AddSoapServices();
 
+// Register SOAP Services
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IHotelService, HotelService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
 
@@ -36,6 +44,8 @@ builder.Services.AddAutoMapper(typeof(Program));
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.WriteIndented = true;
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     });
 
@@ -66,14 +76,45 @@ app.UseAuthorization();
 
 app.UseEndpoints(endpoints =>
 {
+    // SOAP Service Endpoints
+    endpoints.UseSoapEndpoint<ICustomerService>("/Services/CustomerService.svc", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+    endpoints.UseSoapEndpoint<IHotelService>("/Services/HotelService.svc", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+    endpoints.UseSoapEndpoint<IOrderService>("/Services/OrderService.svc", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+    
     // Add SOAP endpoints
     endpoints.UseSoapEndpoints();
+    
+    // MVC Controllers
+    endpoints.MapControllerRoute(
+        name: "areas",
+        pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
     
     endpoints.MapControllerRoute(
         name: "default",
         pattern: "{controller=Home}/{action=Index}/{id?}");
-        
+    
+    endpoints.MapControllers();
     endpoints.MapRazorPages();
+    
+    // Health check endpoint
+    endpoints.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        ResponseWriter = async (context, report) =>
+        {
+            context.Response.ContentType = "application/json";
+            var response = new
+            {
+                status = report.Status.ToString(),
+                checks = report.Entries.Select(e => new
+                {
+                    name = e.Key,
+                    status = e.Value.Status.ToString(),
+                    description = e.Value.Description
+                })
+            };
+            await context.Response.WriteAsJsonAsync(response);
+        }
+    });
 });
 
 // Database initialization and seeding
