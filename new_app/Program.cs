@@ -40,6 +40,9 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
 
+// Add SeedDataService
+builder.Services.AddScoped<SeedDataService>();
+
 // Configure JSON serialization
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -126,10 +129,14 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<ApplicationDbContext>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-        var logger = services.GetRequiredService<ILogger<Program>>();
         
-        // Apply pending migrations and seed data
-        await SeedData.Initialize(context, userManager, roleManager, logger);
+        // Apply migrations and seed data
+        await context.Database.MigrateAsync();
+        await SeedData.Initialize(context, userManager, roleManager);
+        
+        // Initialize demo data
+        var demoSeeder = services.GetRequiredService<SeedDataService>();
+        await demoSeeder.SeedDemoDataAsync();
     }
     catch (Exception ex)
     {
