@@ -53,7 +53,7 @@ public class HotelService : IHotelService
         return hotelDto;
     }
 
-    public async Task UpdateHotelAsync(int id, HotelDto hotelDto)
+    public async Task<bool> UpdateHotelAsync(int id, HotelDto hotelDto)
     {
         var hotelInDb = await _context.Hotels.SingleOrDefaultAsync(c => c.Id == id);
 
@@ -62,9 +62,11 @@ public class HotelService : IHotelService
 
         _mapper.Map(hotelDto, hotelInDb);
         await _context.SaveChangesAsync();
+        
+        return true;
     }
 
-    public async Task DeleteHotelAsync(int id)
+    public async Task<bool> DeleteHotelAsync(int id)
     {
         var hotel = await _context.Hotels.SingleOrDefaultAsync(c => c.Id == id);
 
@@ -73,5 +75,7 @@ public class HotelService : IHotelService
 
         _context.Hotels.Remove(hotel);
         await _context.SaveChangesAsync();
+        
+        return true;
     }
 }
