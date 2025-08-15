@@ -32,7 +32,7 @@ public class CustomerService : ICustomerService
         return customer;
     }
 
-    public async Task DeleteCustomerAsync(int id)
+    public async Task<bool> DeleteCustomerAsync(int id)
     {
         var customer = await _context.Customers.FindAsync(id);
         
@@ -41,5 +41,7 @@ public class CustomerService : ICustomerService
 
         _context.Customers.Remove(customer);
         await _context.SaveChangesAsync();
+        
+        return true;
     }
 }
