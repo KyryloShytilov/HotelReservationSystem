@@ -52,6 +52,22 @@ public static class SeedData
     }
     
     /// <summary>
+    /// Asynchronously initializes the database with seed data.
+    /// This method is called from Program.cs.
+    /// </summary>
+    /// <param name="context">The application database context</param>
+    /// <param name="userManager">The ASP.NET Core Identity user manager</param>
+    /// <param name="roleManager">The ASP.NET Core Identity role manager</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    public static Task InitializeAsync(
+        ApplicationDbContext context, 
+        UserManager<ApplicationUser> userManager,
+        RoleManager<IdentityRole> roleManager)
+    {
+        return Initialize(context, userManager, roleManager);
+    }
+    
+    /// <summary>
     /// Seeds the application roles into the database.
     /// </summary>
     private static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager)
